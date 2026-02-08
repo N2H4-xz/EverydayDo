@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: EverydayDo
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/everydaydo}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:QXRXZXJ5RG9EZXYtU2VjcmV0LUtleS1Gb3ItRGV2ZWxvcG1lbnQtT25seSE=}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:86400}
