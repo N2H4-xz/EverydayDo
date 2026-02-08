@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.stnhh.everydaydo.mapper.TaskInstanceMapper;
 import org.stnhh.everydaydo.model.dto.task.CreateManualTaskRequest;
 import org.stnhh.everydaydo.model.dto.task.TaskInstanceResponse;
@@ -38,6 +39,50 @@ public class TaskInstanceService {
 
         taskInstanceMapper.insert(entity);
         return toResponse(entity);
+    }
+
+    @Transactional
+    public Long addCompletionMinutes(Long userId, Long taskInstanceId, int addedMinutes) {
+        TaskInstanceEntity task = taskInstanceMapper.selectOne(new LambdaQueryWrapper<TaskInstanceEntity>()
+                .eq(TaskInstanceEntity::getId, taskInstanceId)
+                .eq(TaskInstanceEntity::getUserId, userId));
+        if (task == null) {
+            throw new IllegalArgumentException("Task instance not found");
+        }
+
+        int updatedCompleted = task.getCompletedMinutes() + addedMinutes;
+        task.setCompletedMinutes(updatedCompleted);
+        if (updatedCompleted >= task.getPlannedMinutes()) {
+            task.setStatus(TaskStatus.COMPLETED);
+        } else if (updatedCompleted > 0) {
+            task.setStatus(TaskStatus.IN_PROGRESS);
+        }
+        task.setUpdatedAt(LocalDateTime.now());
+        taskInstanceMapper.updateById(task);
+        return task.getId();
+    }
+
+    @Transactional
+    public TaskInstanceEntity createAdHocFromCheckin(Long userId, String title, LocalDate planDate, int completedMinutes) {
+        if (!StringUtils.hasText(title)) {
+            throw new IllegalArgumentException("title cannot be blank");
+        }
+
+        TaskInstanceEntity entity = new TaskInstanceEntity();
+        entity.setUserId(userId);
+        entity.setTemplateId(null);
+        entity.setTitle(title.trim());
+        entity.setDescription(null);
+        entity.setPlanDate(planDate);
+        entity.setPlannedStartTime(null);
+        entity.setPlannedMinutes(completedMinutes);
+        entity.setCompletedMinutes(completedMinutes);
+        entity.setStatus(TaskStatus.COMPLETED);
+        entity.setAdHoc(true);
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+        taskInstanceMapper.insert(entity);
+        return entity;
     }
 
     public List<TaskInstanceResponse> listByDate(Long userId, LocalDate date) {
