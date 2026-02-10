@@ -7,7 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.stnhh.everydaydo.model.dto.checkin.HourlyCheckinResponse;
 import org.stnhh.everydaydo.model.dto.common.ApiResponse;
+import org.stnhh.everydaydo.model.dto.common.PageResponse;
 import org.stnhh.everydaydo.model.dto.stats.CompletionSummaryResponse;
 import org.stnhh.everydaydo.model.enums.SummaryPeriod;
 import org.stnhh.everydaydo.security.SecurityUtils;
@@ -28,5 +30,15 @@ public class StatsController {
         Long userId = SecurityUtils.currentUser().id();
         LocalDate date = referenceDate == null ? LocalDate.now() : referenceDate;
         return ApiResponse.ok(statsService.completionSummary(userId, period, date));
+    }
+
+    @GetMapping("/reviews")
+    public ApiResponse<PageResponse<HourlyCheckinResponse>> reviews(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        Long userId = SecurityUtils.currentUser().id();
+        return ApiResponse.ok(statsService.reviewPage(userId, page, size, date));
     }
 }
