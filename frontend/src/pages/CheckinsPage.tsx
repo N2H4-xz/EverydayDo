@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getCheckinsByDate, getPendingWindow, submitHourlyCheckin } from '@/features/checkins/api'
+import {
+  deleteHourlyCheckin,
+  getCheckinsByDate,
+  getPendingWindowWithReference,
+  submitHourlyCheckin,
+  updateHourlyCheckin,
+} from '@/features/checkins/api'
+import { ApiError } from '@/shared/api/client'
 import { todayDate, toLocalDateTimeInput } from '@/shared/lib/date'
 
 function normalizeReferenceLink(value: string) {
@@ -17,15 +24,29 @@ function normalizeReferenceLink(value: string) {
 export function CheckinsPage() {
   const queryClient = useQueryClient()
   const [date, setDate] = useState(todayDate())
+  const [windowMinutes, setWindowMinutes] = useState(60)
+  const [referenceTime, setReferenceTime] = useState('')
   const [overallComment, setOverallComment] = useState('')
   const [minutesByTaskId, setMinutesByTaskId] = useState<Record<number, number>>({})
   const [linkEnabledByTaskId, setLinkEnabledByTaskId] = useState<Record<number, boolean>>({})
   const [linkByTaskId, setLinkByTaskId] = useState<Record<number, string>>({})
+  const [adHocRows, setAdHocRows] = useState<Array<{ title: string; completedMinutes: number; referenceLink: string }>>([])
+  const [editingCheckinId, setEditingCheckinId] = useState<number | null>(null)
+  const [editingOverallComment, setEditingOverallComment] = useState('')
+  const [editingRecords, setEditingRecords] = useState<
+    Array<{
+      taskInstanceId?: number
+      title?: string
+      completedMinutes: number
+      comment?: string
+      referenceLink?: string
+    }>
+  >([])
   const [formError, setFormError] = useState<string | null>(null)
 
   const pendingQuery = useQuery({
-    queryKey: ['checkins', 'pending'],
-    queryFn: () => getPendingWindow(60),
+    queryKey: ['checkins', 'pending', windowMinutes, referenceTime],
+    queryFn: () => getPendingWindowWithReference(windowMinutes, referenceTime || undefined),
   })
 
   const historyQuery = useQuery({
@@ -40,18 +61,47 @@ export function CheckinsPage() {
       setMinutesByTaskId({})
       setLinkEnabledByTaskId({})
       setLinkByTaskId({})
+      setAdHocRows([])
       queryClient.invalidateQueries({ queryKey: ['checkins', 'pending'] })
       queryClient.invalidateQueries({ queryKey: ['checkins', 'history', date] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (error) => {
+      setFormError((error as ApiError).message)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ checkinId, payload }: { checkinId: number; payload: Parameters<typeof updateHourlyCheckin>[1] }) =>
+      updateHourlyCheckin(checkinId, payload),
+    onSuccess: () => {
+      setEditingCheckinId(null)
+      setEditingOverallComment('')
+      setEditingRecords([])
+      queryClient.invalidateQueries({ queryKey: ['checkins', 'history', date] })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (error) => {
+      setFormError((error as ApiError).message)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteHourlyCheckin,
+    onSuccess: () => {
+      setEditingCheckinId(null)
+      queryClient.invalidateQueries({ queryKey: ['checkins', 'history', date] })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
   const payloadRecords = useMemo(() => {
     const plannedTasks = pendingQuery.data?.plannedTasks ?? []
-    return plannedTasks
+    const plannedRecords = plannedTasks
       .map((task) => {
-        const normalizedLink = linkEnabledByTaskId[task.id]
-          ? normalizeReferenceLink(linkByTaskId[task.id] ?? '')
-          : null
+        const normalizedLink = linkEnabledByTaskId[task.id] ? normalizeReferenceLink(linkByTaskId[task.id] ?? '') : null
         return {
           taskInstanceId: task.id,
           completedMinutes: minutesByTaskId[task.id] ?? 0,
@@ -59,18 +109,47 @@ export function CheckinsPage() {
         }
       })
       .filter((record) => record.completedMinutes > 0)
-  }, [linkByTaskId, linkEnabledByTaskId, minutesByTaskId, pendingQuery.data?.plannedTasks])
 
-  const canSubmit =
-    Boolean(pendingQuery.data) &&
-    !pendingQuery.data?.submitted &&
-    payloadRecords.length > 0 &&
-    !submitMutation.isPending
+    const adHocRecords = adHocRows
+      .map((item) => ({
+        title: item.title.trim(),
+        completedMinutes: item.completedMinutes,
+        referenceLink: normalizeReferenceLink(item.referenceLink) ?? undefined,
+      }))
+      .filter((item) => item.title && item.completedMinutes > 0)
+
+    return [...plannedRecords, ...adHocRecords]
+  }, [adHocRows, linkByTaskId, linkEnabledByTaskId, minutesByTaskId, pendingQuery.data?.plannedTasks])
+
+  const canSubmit = Boolean(pendingQuery.data) && !pendingQuery.data?.submitted && payloadRecords.length > 0 && !submitMutation.isPending
 
   return (
     <section className="grid gap-6 lg:grid-cols-2">
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-semibold text-slate-900">当前窗口待打卡</h2>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">
+            窗口分钟数
+            <input
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
+              max={720}
+              min={1}
+              onChange={(event) => setWindowMinutes(Number(event.target.value))}
+              type="number"
+              value={windowMinutes}
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            参考时间（可选）
+            <input
+              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
+              onChange={(event) => setReferenceTime(event.target.value)}
+              type="datetime-local"
+              value={referenceTime}
+            />
+          </label>
+        </div>
+
         {pendingQuery.isLoading ? <p className="mt-3 text-slate-600">加载中...</p> : null}
 
         {pendingQuery.data ? (
@@ -80,9 +159,7 @@ export function CheckinsPage() {
               {toLocalDateTimeInput(pendingQuery.data.windowStart)} - {toLocalDateTimeInput(pendingQuery.data.windowEnd)}
             </p>
 
-            {pendingQuery.data.submitted ? (
-              <p className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-700">该时间窗口已提交。</p>
-            ) : null}
+            {pendingQuery.data.submitted ? <p className="mt-3 rounded-lg bg-teal-50 p-3 text-sm text-teal-700">该时间窗口已提交。</p> : null}
 
             <div className="mt-4 space-y-2">
               {pendingQuery.data.plannedTasks.map((task) => (
@@ -140,6 +217,67 @@ export function CheckinsPage() {
               ))}
             </div>
 
+            <div className="mt-4 rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">补充临时任务</p>
+                <button
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                  onClick={() => setAdHocRows((prev) => [...prev, { title: '', completedMinutes: 0, referenceLink: '' }])}
+                  type="button"
+                >
+                  添加一条
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {adHocRows.length === 0 ? <p className="text-xs text-slate-500">没有临时任务时可留空。</p> : null}
+                {adHocRows.map((row, index) => (
+                  <div className="grid gap-2 md:grid-cols-3" key={`adhoc-${index}`}>
+                    <input
+                      className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                      onChange={(event) =>
+                        setAdHocRows((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, title: event.target.value } : item)))
+                      }
+                      placeholder="临时任务标题"
+                      value={row.title}
+                    />
+                    <input
+                      className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                      min={0}
+                      onChange={(event) =>
+                        setAdHocRows((prev) =>
+                          prev.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, completedMinutes: Number(event.target.value) } : item
+                          )
+                        )
+                      }
+                      placeholder="分钟"
+                      type="number"
+                      value={row.completedMinutes}
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                        onChange={(event) =>
+                          setAdHocRows((prev) =>
+                            prev.map((item, itemIndex) => (itemIndex === index ? { ...item, referenceLink: event.target.value } : item))
+                          )
+                        }
+                        placeholder="参考链接（可选）"
+                        value={row.referenceLink}
+                      />
+                      <button
+                        className="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50"
+                        onClick={() => setAdHocRows((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                        type="button"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <label className="mt-4 block text-sm font-medium text-slate-700">
               总结备注
               <textarea
@@ -191,34 +329,152 @@ export function CheckinsPage() {
         <div className="mt-4 space-y-3">
           {historyQuery.isLoading ? <p className="text-slate-600">加载中...</p> : null}
           {historyQuery.data?.length === 0 ? <p className="text-slate-600">当天没有打卡记录。</p> : null}
-          {historyQuery.data?.map((item) => (
-            <article className="rounded-xl border border-slate-200 p-4" key={item.checkinId}>
-              <p className="text-sm font-medium text-slate-800">
-                {toLocalDateTimeInput(item.windowStart)} - {toLocalDateTimeInput(item.windowEnd)}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">记录条数：{item.records.length}</p>
-              <div className="mt-2 space-y-1">
-                {item.records.map((record, index) => {
-                  const href = record.referenceLink ? normalizeReferenceLink(record.referenceLink) : null
-                  return (
-                    <div className="text-sm text-slate-700" key={`${item.checkinId}-${record.taskInstanceId ?? index}`}>
-                      <span>+{record.addedMinutes} 分钟</span>
-                      {href ? (
-                        <a
-                          className="ml-3 font-medium text-teal-700 hover:text-teal-600"
-                          href={href}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          打开链接
-                        </a>
-                      ) : null}
+          {historyQuery.data?.map((item) => {
+            const isEditing = editingCheckinId === item.checkinId
+            return (
+              <article className="rounded-xl border border-slate-200 p-4" key={item.checkinId}>
+                <p className="text-sm font-medium text-slate-800">
+                  {toLocalDateTimeInput(item.windowStart)} - {toLocalDateTimeInput(item.windowEnd)}
+                </p>
+
+                {isEditing ? (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      onChange={(event) => setEditingOverallComment(event.target.value)}
+                      placeholder="窗口总结"
+                      rows={2}
+                      value={editingOverallComment}
+                    />
+                    {editingRecords.map((record, index) => (
+                      <div className="grid gap-2 rounded-lg border border-slate-200 p-2 md:grid-cols-3" key={`record-${index}`}>
+                        <input
+                          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          min={1}
+                          onChange={(event) =>
+                            setEditingRecords((prev) =>
+                              prev.map((itemRecord, itemIndex) =>
+                                itemIndex === index ? { ...itemRecord, completedMinutes: Number(event.target.value) } : itemRecord
+                              )
+                            )
+                          }
+                          type="number"
+                          value={record.completedMinutes}
+                        />
+                        <input
+                          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          onChange={(event) =>
+                            setEditingRecords((prev) =>
+                              prev.map((itemRecord, itemIndex) =>
+                                itemIndex === index ? { ...itemRecord, comment: event.target.value } : itemRecord
+                              )
+                            )
+                          }
+                          placeholder="备注"
+                          value={record.comment ?? ''}
+                        />
+                        <input
+                          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          onChange={(event) =>
+                            setEditingRecords((prev) =>
+                              prev.map((itemRecord, itemIndex) =>
+                                itemIndex === index ? { ...itemRecord, referenceLink: event.target.value } : itemRecord
+                              )
+                            )
+                          }
+                          placeholder="参考链接"
+                          value={record.referenceLink ?? ''}
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <button
+                        className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-600"
+                        onClick={() => {
+                          setFormError(null)
+                          updateMutation.mutate({
+                            checkinId: item.checkinId,
+                            payload: {
+                              overallComment: editingOverallComment || undefined,
+                              records: editingRecords.map((record) => ({
+                                taskInstanceId: record.taskInstanceId,
+                                title: record.taskInstanceId ? undefined : record.title || '历史临时任务',
+                                completedMinutes: record.completedMinutes,
+                                comment: record.comment,
+                                referenceLink: normalizeReferenceLink(record.referenceLink ?? '') ?? undefined,
+                              })),
+                            },
+                          })
+                        }}
+                        type="button"
+                      >
+                        保存修改
+                      </button>
+                      <button
+                        className="rounded-md border border-slate-300 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          setEditingCheckinId(null)
+                          setEditingOverallComment('')
+                          setEditingRecords([])
+                        }}
+                        type="button"
+                      >
+                        取消
+                      </button>
                     </div>
-                  )
-                })}
-              </div>
-            </article>
-          ))}
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm text-slate-600">记录条数：{item.records.length}</p>
+                    {item.overallComment ? <p className="mt-1 text-sm text-slate-700">总结：{item.overallComment}</p> : null}
+                    <div className="mt-2 space-y-1">
+                      {item.records.map((record, index) => {
+                        const href = record.referenceLink ? normalizeReferenceLink(record.referenceLink) : null
+                        return (
+                          <div className="text-sm text-slate-700" key={`${item.checkinId}-${record.taskInstanceId ?? index}`}>
+                            <span>+{record.addedMinutes} 分钟</span>
+                            {href ? (
+                              <a className="ml-3 font-medium text-teal-700 hover:text-teal-600" href={href} rel="noreferrer" target="_blank">
+                                打开链接
+                              </a>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          setEditingCheckinId(item.checkinId)
+                          setEditingOverallComment(item.overallComment ?? '')
+                          setEditingRecords(
+                            item.records.map((record) => ({
+                              taskInstanceId: record.taskInstanceId ?? undefined,
+                              title: record.taskInstanceId ? undefined : '历史临时任务',
+                              completedMinutes: record.addedMinutes,
+                              comment: record.comment ?? '',
+                              referenceLink: record.referenceLink ?? '',
+                            }))
+                          )
+                        }}
+                        type="button"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        className="rounded-md border border-rose-300 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50"
+                        onClick={() => deleteMutation.mutate(item.checkinId)}
+                        type="button"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
+            )
+          })}
         </div>
       </div>
     </section>

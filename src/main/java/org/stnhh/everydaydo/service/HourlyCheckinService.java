@@ -18,6 +18,7 @@ import org.stnhh.everydaydo.model.dto.checkin.CheckinRecordResponse;
 import org.stnhh.everydaydo.model.dto.checkin.HourlyCheckinResponse;
 import org.stnhh.everydaydo.model.dto.checkin.PendingWindowCheckinResponse;
 import org.stnhh.everydaydo.model.dto.checkin.SubmitHourlyCheckinRequest;
+import org.stnhh.everydaydo.model.dto.checkin.UpdateHourlyCheckinRequest;
 import org.stnhh.everydaydo.model.dto.task.TaskInstanceResponse;
 import org.stnhh.everydaydo.model.entity.CompletionLogEntity;
 import org.stnhh.everydaydo.model.entity.TaskInstanceEntity;
@@ -50,53 +51,12 @@ public class HourlyCheckinService {
         checkin.setCreatedAt(LocalDateTime.now());
         timeWindowCheckinMapper.insert(checkin);
 
-        List<CheckinRecordResponse> recordResponses = new ArrayList<>();
-        for (CheckinRecordRequest record : request.records()) {
-            if (record.completedMinutes() == null || record.completedMinutes() <= 0) {
-                throw new IllegalArgumentException("completedMinutes must be greater than 0");
-            }
-
-            Long taskInstanceId;
-            boolean createdAsAdHoc = false;
-
-            if (record.taskInstanceId() != null) {
-                taskInstanceId = taskInstanceService.addCompletionMinutes(
-                        userId,
-                        record.taskInstanceId(),
-                        record.completedMinutes()
-                );
-            } else {
-                if (!StringUtils.hasText(record.title())) {
-                    throw new IllegalArgumentException("title is required when taskInstanceId is missing");
-                }
-                TaskInstanceEntity adHoc = taskInstanceService.createAdHocFromCheckin(
-                        userId,
-                        record.title().trim(),
-                        request.windowStart().toLocalDate(),
-                        record.completedMinutes()
-                );
-                taskInstanceId = adHoc.getId();
-                createdAsAdHoc = true;
-            }
-
-            CompletionLogEntity log = new CompletionLogEntity();
-            log.setCheckinId(checkin.getId());
-            log.setUserId(userId);
-            log.setTaskInstanceId(taskInstanceId);
-            log.setAddedMinutes(record.completedMinutes());
-            log.setComment(record.comment());
-            log.setReferenceLink(record.referenceLink());
-            log.setCreatedAt(LocalDateTime.now());
-            completionLogMapper.insert(log);
-
-            recordResponses.add(new CheckinRecordResponse(
-                    taskInstanceId,
-                    record.completedMinutes(),
-                    record.comment(),
-                    record.referenceLink(),
-                    createdAsAdHoc
-            ));
-        }
+        List<CheckinRecordResponse> recordResponses = createLogsAndApplyMinutes(
+                userId,
+                checkin.getId(),
+                checkin.getWindowStart().toLocalDate(),
+                request.records()
+        );
 
         return new HourlyCheckinResponse(
                 checkin.getId(),
@@ -105,6 +65,58 @@ public class HourlyCheckinService {
                 checkin.getOverallComment(),
                 recordResponses
         );
+    }
+
+    @Transactional
+    public HourlyCheckinResponse update(Long userId, Long checkinId, UpdateHourlyCheckinRequest request) {
+        TimeWindowCheckinEntity checkin = requireOwnedCheckin(userId, checkinId);
+
+        List<CompletionLogEntity> oldLogs = completionLogMapper.selectList(
+                new LambdaQueryWrapper<CompletionLogEntity>()
+                        .eq(CompletionLogEntity::getCheckinId, checkin.getId())
+        );
+        for (CompletionLogEntity oldLog : oldLogs) {
+            if (oldLog.getTaskInstanceId() != null && oldLog.getAddedMinutes() != null && oldLog.getAddedMinutes() > 0) {
+                taskInstanceService.adjustCompletionMinutes(userId, oldLog.getTaskInstanceId(), -oldLog.getAddedMinutes());
+            }
+        }
+        completionLogMapper.delete(new LambdaQueryWrapper<CompletionLogEntity>()
+                .eq(CompletionLogEntity::getCheckinId, checkin.getId()));
+
+        checkin.setOverallComment(request.overallComment());
+        timeWindowCheckinMapper.updateById(checkin);
+
+        List<CheckinRecordResponse> records = createLogsAndApplyMinutes(
+                userId,
+                checkin.getId(),
+                checkin.getWindowStart().toLocalDate(),
+                request.records()
+        );
+
+        return new HourlyCheckinResponse(
+                checkin.getId(),
+                checkin.getWindowStart(),
+                checkin.getWindowEnd(),
+                checkin.getOverallComment(),
+                records
+        );
+    }
+
+    @Transactional
+    public void delete(Long userId, Long checkinId) {
+        TimeWindowCheckinEntity checkin = requireOwnedCheckin(userId, checkinId);
+        List<CompletionLogEntity> logs = completionLogMapper.selectList(
+                new LambdaQueryWrapper<CompletionLogEntity>()
+                        .eq(CompletionLogEntity::getCheckinId, checkin.getId())
+        );
+        for (CompletionLogEntity log : logs) {
+            if (log.getTaskInstanceId() != null && log.getAddedMinutes() != null && log.getAddedMinutes() > 0) {
+                taskInstanceService.adjustCompletionMinutes(userId, log.getTaskInstanceId(), -log.getAddedMinutes());
+            }
+        }
+        completionLogMapper.delete(new LambdaQueryWrapper<CompletionLogEntity>()
+                .eq(CompletionLogEntity::getCheckinId, checkin.getId()));
+        timeWindowCheckinMapper.deleteById(checkin.getId());
     }
 
     public List<HourlyCheckinResponse> listByDate(Long userId, LocalDate date) {
@@ -206,6 +218,67 @@ public class HourlyCheckinService {
                 .eq(TimeWindowCheckinEntity::getWindowStart, windowStart)
                 .eq(TimeWindowCheckinEntity::getWindowEnd, windowEnd));
         return count != null && count > 0;
+    }
+
+    private TimeWindowCheckinEntity requireOwnedCheckin(Long userId, Long checkinId) {
+        TimeWindowCheckinEntity checkin = timeWindowCheckinMapper.selectOne(new LambdaQueryWrapper<TimeWindowCheckinEntity>()
+                .eq(TimeWindowCheckinEntity::getId, checkinId)
+                .eq(TimeWindowCheckinEntity::getUserId, userId));
+        if (checkin == null) {
+            throw new IllegalArgumentException("Checkin not found");
+        }
+        return checkin;
+    }
+
+    private List<CheckinRecordResponse> createLogsAndApplyMinutes(
+            Long userId,
+            Long checkinId,
+            LocalDate planDate,
+            List<CheckinRecordRequest> records
+    ) {
+        List<CheckinRecordResponse> recordResponses = new ArrayList<>();
+        for (CheckinRecordRequest record : records) {
+            if (record.completedMinutes() == null || record.completedMinutes() <= 0) {
+                throw new IllegalArgumentException("completedMinutes must be greater than 0");
+            }
+
+            Long taskInstanceId;
+            boolean createdAsAdHoc = false;
+            if (record.taskInstanceId() != null) {
+                taskInstanceId = taskInstanceService.addCompletionMinutes(userId, record.taskInstanceId(), record.completedMinutes());
+            } else {
+                if (!StringUtils.hasText(record.title())) {
+                    throw new IllegalArgumentException("title is required when taskInstanceId is missing");
+                }
+                TaskInstanceEntity adHoc = taskInstanceService.createAdHocFromCheckin(
+                        userId,
+                        record.title().trim(),
+                        planDate,
+                        record.completedMinutes()
+                );
+                taskInstanceId = adHoc.getId();
+                createdAsAdHoc = true;
+            }
+
+            CompletionLogEntity log = new CompletionLogEntity();
+            log.setCheckinId(checkinId);
+            log.setUserId(userId);
+            log.setTaskInstanceId(taskInstanceId);
+            log.setAddedMinutes(record.completedMinutes());
+            log.setComment(record.comment());
+            log.setReferenceLink(record.referenceLink());
+            log.setCreatedAt(LocalDateTime.now());
+            completionLogMapper.insert(log);
+
+            recordResponses.add(new CheckinRecordResponse(
+                    taskInstanceId,
+                    record.completedMinutes(),
+                    record.comment(),
+                    record.referenceLink(),
+                    createdAsAdHoc
+            ));
+        }
+        return recordResponses;
     }
 
     private TaskInstanceResponse toTaskResponse(TaskInstanceEntity entity) {

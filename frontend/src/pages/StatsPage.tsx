@@ -69,6 +69,12 @@ export function StatsPage() {
 
         {summaryQuery.data ? (
           <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <article className="rounded-xl border border-slate-200 p-4 md:col-span-2 lg:col-span-3">
+              <p className="text-sm text-slate-500">统计范围</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">
+                {summaryQuery.data.startDate} ~ {summaryQuery.data.endDate}
+              </p>
+            </article>
             <article className="rounded-xl border border-slate-200 p-4">
               <p className="text-sm text-slate-500">任务完成率</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">{summaryQuery.data.taskCompletionRate.toFixed(2)}%</p>
@@ -84,6 +90,10 @@ export function StatsPage() {
             <article className="rounded-xl border border-slate-200 p-4">
               <p className="text-sm text-slate-500">已完成任务</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">{summaryQuery.data.completedTasks}</p>
+            </article>
+            <article className="rounded-xl border border-slate-200 p-4">
+              <p className="text-sm text-slate-500">临时任务数</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{summaryQuery.data.adHocTasks}</p>
             </article>
             <article className="rounded-xl border border-slate-200 p-4">
               <p className="text-sm text-slate-500">计划时长</p>

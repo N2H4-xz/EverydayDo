@@ -24,6 +24,14 @@ export function getPendingWindow(windowMinutes = 60) {
   })
 }
 
+export function getPendingWindowWithReference(windowMinutes = 60, referenceTime?: string) {
+  return request<PendingWindowCheckinResponse>({
+    url: '/checkins/hourly/pending',
+    method: 'GET',
+    params: { windowMinutes, referenceTime },
+  })
+}
+
 export function getCheckinsByDate(date: string) {
   return request<HourlyCheckinResponse[]>({
     url: '/checkins/hourly',
@@ -37,5 +45,20 @@ export function submitHourlyCheckin(payload: SubmitHourlyCheckinPayload) {
     url: '/checkins/hourly',
     method: 'POST',
     data: payload,
+  })
+}
+
+export function updateHourlyCheckin(checkinId: number, payload: Pick<SubmitHourlyCheckinPayload, 'overallComment' | 'records'>) {
+  return request<HourlyCheckinResponse>({
+    url: `/checkins/hourly/${checkinId}`,
+    method: 'PUT',
+    data: payload,
+  })
+}
+
+export function deleteHourlyCheckin(checkinId: number) {
+  return request<boolean>({
+    url: `/checkins/hourly/${checkinId}`,
+    method: 'DELETE',
   })
 }

@@ -1,5 +1,5 @@
 import { request } from '@/shared/api/client'
-import type { TaskInstanceResponse } from '@/shared/api/types'
+import type { TaskInstanceResponse, TaskStatus } from '@/shared/api/types'
 
 interface CreateManualTaskPayload {
   title: string
@@ -7,6 +7,15 @@ interface CreateManualTaskPayload {
   planDate: string
   plannedStartTime?: string
   plannedMinutes: number
+}
+
+interface UpdateTaskPayload {
+  title: string
+  description?: string
+  planDate: string
+  plannedStartTime?: string
+  plannedMinutes: number
+  status: TaskStatus
 }
 
 export function getTasksByDate(date: string) {
@@ -30,5 +39,28 @@ export function generatePlanForDate(date: string) {
     url: '/plans/generate',
     method: 'POST',
     params: { date },
+  })
+}
+
+export function updateTask(taskId: number, payload: UpdateTaskPayload) {
+  return request<TaskInstanceResponse>({
+    url: `/tasks/${taskId}`,
+    method: 'PUT',
+    data: payload,
+  })
+}
+
+export function setTaskStatus(taskId: number, status: TaskStatus) {
+  return request<TaskInstanceResponse>({
+    url: `/tasks/${taskId}/status`,
+    method: 'PATCH',
+    params: { status },
+  })
+}
+
+export function deleteTask(taskId: number) {
+  return request<boolean>({
+    url: `/tasks/${taskId}`,
+    method: 'DELETE',
   })
 }

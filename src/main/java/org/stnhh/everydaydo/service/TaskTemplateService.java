@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.stnhh.everydaydo.mapper.TaskTemplateMapper;
 import org.stnhh.everydaydo.model.dto.task.CreateTemplateRequest;
 import org.stnhh.everydaydo.model.dto.task.TaskTemplateResponse;
+import org.stnhh.everydaydo.model.dto.task.UpdateTemplateRequest;
 import org.stnhh.everydaydo.model.entity.TaskTemplateEntity;
 import org.stnhh.everydaydo.model.enums.RecurrenceType;
 
@@ -43,6 +44,48 @@ public class TaskTemplateService {
         return toResponse(entity);
     }
 
+    @Transactional
+    public TaskTemplateResponse update(Long userId, Long templateId, UpdateTemplateRequest request) {
+        validateRequest(
+                request.recurrenceType(),
+                request.dayOfWeek(),
+                request.specificDate(),
+                request.activeFrom(),
+                request.activeTo()
+        );
+
+        TaskTemplateEntity entity = requireOwnedTemplate(userId, templateId);
+        entity.setTitle(request.title());
+        entity.setDescription(request.description());
+        entity.setEstimatedMinutes(request.estimatedMinutes());
+        entity.setPriority(request.priority());
+        entity.setRecurrenceType(request.recurrenceType());
+        entity.setDayOfWeek(request.dayOfWeek());
+        entity.setSpecificDate(request.specificDate());
+        entity.setDefaultStartTime(request.defaultStartTime());
+        entity.setActiveFrom(request.activeFrom());
+        entity.setActiveTo(request.activeTo());
+        entity.setEnabled(request.enabled());
+        entity.setUpdatedAt(LocalDateTime.now());
+        taskTemplateMapper.updateById(entity);
+        return toResponse(entity);
+    }
+
+    @Transactional
+    public TaskTemplateResponse setEnabled(Long userId, Long templateId, boolean enabled) {
+        TaskTemplateEntity entity = requireOwnedTemplate(userId, templateId);
+        entity.setEnabled(enabled);
+        entity.setUpdatedAt(LocalDateTime.now());
+        taskTemplateMapper.updateById(entity);
+        return toResponse(entity);
+    }
+
+    @Transactional
+    public void delete(Long userId, Long templateId) {
+        TaskTemplateEntity entity = requireOwnedTemplate(userId, templateId);
+        taskTemplateMapper.deleteById(entity.getId());
+    }
+
     public List<TaskTemplateResponse> listByUser(Long userId) {
         return taskTemplateMapper.selectList(new LambdaQueryWrapper<TaskTemplateEntity>()
                         .eq(TaskTemplateEntity::getUserId, userId)
@@ -58,12 +101,41 @@ public class TaskTemplateService {
     }
 
     private void validateRequest(CreateTemplateRequest request) {
-        if (request.recurrenceType() == RecurrenceType.WEEKLY && request.dayOfWeek() == null) {
+        validateRequest(
+                request.recurrenceType(),
+                request.dayOfWeek(),
+                request.specificDate(),
+                request.activeFrom(),
+                request.activeTo()
+        );
+    }
+
+    private void validateRequest(
+            RecurrenceType recurrenceType,
+            Integer dayOfWeek,
+            LocalDate specificDate,
+            LocalDate activeFrom,
+            LocalDate activeTo
+    ) {
+        if (recurrenceType == RecurrenceType.WEEKLY && dayOfWeek == null) {
             throw new IllegalArgumentException("dayOfWeek is required for WEEKLY templates");
         }
-        if (request.recurrenceType() == RecurrenceType.SPECIFIC_DATE && request.specificDate() == null) {
+        if (recurrenceType == RecurrenceType.SPECIFIC_DATE && specificDate == null) {
             throw new IllegalArgumentException("specificDate is required for SPECIFIC_DATE templates");
         }
+        if (activeFrom != null && activeTo != null && activeFrom.isAfter(activeTo)) {
+            throw new IllegalArgumentException("activeFrom cannot be later than activeTo");
+        }
+    }
+
+    private TaskTemplateEntity requireOwnedTemplate(Long userId, Long templateId) {
+        TaskTemplateEntity entity = taskTemplateMapper.selectOne(new LambdaQueryWrapper<TaskTemplateEntity>()
+                .eq(TaskTemplateEntity::getId, templateId)
+                .eq(TaskTemplateEntity::getUserId, userId));
+        if (entity == null) {
+            throw new IllegalArgumentException("Template not found");
+        }
+        return entity;
     }
 
     private TaskTemplateResponse toResponse(TaskTemplateEntity entity) {

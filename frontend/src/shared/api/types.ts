@@ -62,6 +62,20 @@ export interface TaskTemplateResponse {
   enabled: boolean
 }
 
+export interface UpdateTaskTemplatePayload {
+  title: string
+  description?: string
+  estimatedMinutes: number
+  priority: number
+  recurrenceType: RecurrenceType
+  dayOfWeek?: number
+  specificDate?: string
+  defaultStartTime?: string
+  activeFrom?: string
+  activeTo?: string
+  enabled: boolean
+}
+
 export interface HourlyCheckinResponse {
   checkinId: number
   windowStart: string
@@ -85,6 +99,13 @@ export interface PendingWindowCheckinResponse {
   submitted: boolean
   prompt: string
   plannedTasks: TaskInstanceResponse[]
+}
+
+export interface HolidayDayResponse {
+  holidayDate: string
+  holiday: boolean
+  name: string | null
+  customized: boolean
 }
 
 export interface CompletionSummaryResponse {

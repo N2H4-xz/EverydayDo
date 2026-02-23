@@ -6,8 +6,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.stnhh.everydaydo.model.dto.checkin.HourlyCheckinResponse;
 import org.stnhh.everydaydo.model.dto.checkin.PendingWindowCheckinResponse;
 import org.stnhh.everydaydo.model.dto.checkin.SubmitHourlyCheckinRequest;
+import org.stnhh.everydaydo.model.dto.checkin.UpdateHourlyCheckinRequest;
 import org.stnhh.everydaydo.model.dto.common.ApiResponse;
 import org.stnhh.everydaydo.model.dto.task.TaskInstanceResponse;
 import org.stnhh.everydaydo.security.SecurityUtils;
@@ -31,6 +35,22 @@ public class HourlyCheckinController {
     public ApiResponse<HourlyCheckinResponse> submit(@Valid @RequestBody SubmitHourlyCheckinRequest request) {
         Long userId = SecurityUtils.currentUser().id();
         return ApiResponse.ok(hourlyCheckinService.submit(userId, request));
+    }
+
+    @PutMapping("/{checkinId}")
+    public ApiResponse<HourlyCheckinResponse> update(
+            @PathVariable Long checkinId,
+            @Valid @RequestBody UpdateHourlyCheckinRequest request
+    ) {
+        Long userId = SecurityUtils.currentUser().id();
+        return ApiResponse.ok(hourlyCheckinService.update(userId, checkinId, request));
+    }
+
+    @DeleteMapping("/{checkinId}")
+    public ApiResponse<Boolean> delete(@PathVariable Long checkinId) {
+        Long userId = SecurityUtils.currentUser().id();
+        hourlyCheckinService.delete(userId, checkinId);
+        return ApiResponse.ok(true);
     }
 
     @GetMapping

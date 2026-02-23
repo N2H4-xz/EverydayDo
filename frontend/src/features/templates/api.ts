@@ -1,5 +1,5 @@
 import { request } from '@/shared/api/client'
-import type { RecurrenceType, TaskTemplateResponse } from '@/shared/api/types'
+import type { RecurrenceType, TaskTemplateResponse, UpdateTaskTemplatePayload } from '@/shared/api/types'
 
 interface CreateTemplatePayload {
   title: string
@@ -26,5 +26,28 @@ export function createTemplate(payload: CreateTemplatePayload) {
     url: '/templates',
     method: 'POST',
     data: payload,
+  })
+}
+
+export function updateTemplate(templateId: number, payload: UpdateTaskTemplatePayload) {
+  return request<TaskTemplateResponse>({
+    url: `/templates/${templateId}`,
+    method: 'PUT',
+    data: payload,
+  })
+}
+
+export function setTemplateEnabled(templateId: number, enabled: boolean) {
+  return request<TaskTemplateResponse>({
+    url: `/templates/${templateId}/enabled`,
+    method: 'PATCH',
+    params: { enabled },
+  })
+}
+
+export function deleteTemplate(templateId: number) {
+  return request<boolean>({
+    url: `/templates/${templateId}`,
+    method: 'DELETE',
   })
 }

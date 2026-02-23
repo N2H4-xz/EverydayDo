@@ -9,6 +9,7 @@ const navItems = [
   { to: '/templates', label: '周期任务' },
   { to: '/checkins', label: '小时打卡' },
   { to: '/stats', label: '统计' },
+  { to: '/holidays', label: '节假日' },
 ]
 
 export function AppLayout() {

@@ -7,6 +7,7 @@ import { TodayPage } from '@/pages/TodayPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { CheckinsPage } from '@/pages/CheckinsPage'
 import { StatsPage } from '@/pages/StatsPage'
+import { HolidaysPage } from '@/pages/HolidaysPage'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   if (!hasToken()) {
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
       { path: 'templates', element: <TemplatesPage /> },
       { path: 'checkins', element: <CheckinsPage /> },
       { path: 'stats', element: <StatsPage /> },
+      { path: 'holidays', element: <HolidaysPage /> },
     ],
   },
   {
