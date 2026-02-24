@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import 'react-datepicker/dist/react-datepicker.css';
 
 @tailwind base;
 @tailwind components;
@@ -31,4 +32,76 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+.ed-datepicker-popper {
+  z-index: 30;
+}
+
+.ed-datepicker-input {
+  color: #0f172a;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ed-datepicker-input::placeholder {
+  color: #94a3b8;
+}
+
+.ed-datepicker-input:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.14);
+}
+
+.ed-datepicker-popper .react-datepicker {
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  box-shadow: 0 14px 36px -20px rgba(15, 23, 42, 0.35);
+  font-family: 'IBM Plex Sans', sans-serif;
+  overflow: hidden;
+}
+
+.ed-datepicker-popper .react-datepicker__header {
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ed-datepicker-popper .react-datepicker__current-month,
+.ed-datepicker-popper .react-datepicker-time__header {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.ed-datepicker-popper .react-datepicker__day,
+.ed-datepicker-popper .react-datepicker__day-name,
+.ed-datepicker-popper .react-datepicker__time-name {
+  color: #0f172a;
+}
+
+.ed-datepicker-popper .react-datepicker__day-name {
+  font-weight: 600;
+  color: #334155;
+}
+
+.ed-datepicker-popper .react-datepicker__day--selected,
+.ed-datepicker-popper .react-datepicker__day--keyboard-selected,
+.ed-datepicker-popper .react-datepicker__time-list-item--selected {
+  background: #0f766e;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.ed-datepicker-popper .react-datepicker__day:hover,
+.ed-datepicker-popper .react-datepicker__time-list-item:hover {
+  background: #ccfbf1;
+}
+
+.ed-datepicker-popper .react-datepicker__time-container {
+  border-left: 1px solid #e2e8f0;
+}
+
+.ed-datepicker-popper .react-datepicker__time-list-item {
+  border-bottom: 1px solid #f1f5f9;
 }

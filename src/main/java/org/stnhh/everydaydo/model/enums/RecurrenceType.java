@@ -5,5 +5,6 @@ public enum RecurrenceType {
     WORKDAY,
     HOLIDAY,
     WEEKLY,
-    SPECIFIC_DATE
+    SPECIFIC_DATE,
+    INTERVAL_DAYS
 }

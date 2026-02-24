@@ -33,6 +33,8 @@ public class TaskTemplateEntity {
 
     private LocalDate specificDate;
 
+    private Integer intervalDays;
+
     private LocalTime defaultStartTime;
 
     private LocalDate activeFrom;

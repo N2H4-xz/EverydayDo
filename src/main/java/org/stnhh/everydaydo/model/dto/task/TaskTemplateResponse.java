@@ -13,6 +13,7 @@ public record TaskTemplateResponse(
         RecurrenceType recurrenceType,
         Integer dayOfWeek,
         LocalDate specificDate,
+        Integer intervalDays,
         LocalTime defaultStartTime,
         LocalDate activeFrom,
         LocalDate activeTo,

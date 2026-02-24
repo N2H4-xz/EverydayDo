@@ -4,7 +4,13 @@ import { createTemplate, deleteTemplate, getTemplates, setTemplateEnabled, updat
 import type { RecurrenceType, TaskTemplateResponse, UpdateTaskTemplatePayload } from '@/shared/api/types'
 import { ApiError } from '@/shared/api/client'
 
-const recurrenceOptions: RecurrenceType[] = ['DAILY', 'WORKDAY', 'HOLIDAY', 'WEEKLY', 'SPECIFIC_DATE']
+const recurrenceOptions: RecurrenceType[] = ['DAILY', 'WORKDAY', 'HOLIDAY', 'WEEKLY', 'SPECIFIC_DATE', 'INTERVAL_DAYS']
+
+function parseNumberInput(rawValue: string) {
+  const normalizedValue = rawValue.replace(/^0+(?=\d)/, '')
+  const nextValue = normalizedValue === '' ? 0 : Number(normalizedValue)
+  return { normalizedValue, nextValue }
+}
 
 function toForm(template?: TaskTemplateResponse): UpdateTaskTemplatePayload {
   return {
@@ -15,6 +21,7 @@ function toForm(template?: TaskTemplateResponse): UpdateTaskTemplatePayload {
     recurrenceType: template?.recurrenceType ?? 'DAILY',
     dayOfWeek: template?.dayOfWeek ?? 1,
     specificDate: template?.specificDate ?? '',
+    intervalDays: template?.intervalDays ?? 1,
     defaultStartTime: template?.defaultStartTime ?? '',
     activeFrom: template?.activeFrom ?? '',
     activeTo: template?.activeTo ?? '',
@@ -83,10 +90,10 @@ export function TemplatesPage() {
   }, [createMutation.isPending, editingTemplateId, updateMutation.isPending])
 
   return (
-    <section className="grid gap-6 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-2 lg:overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">周期任务列表</h2>
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {templatesQuery.isLoading ? <p className="text-slate-600">加载中...</p> : null}
           {templatesQuery.data?.length === 0 ? <p className="text-slate-600">还没有周期任务，先创建一个。</p> : null}
           {templatesQuery.data?.map((template) => (
@@ -95,7 +102,11 @@ export function TemplatesPage() {
                 <div>
                   <h3 className="font-semibold text-slate-900">{template.title}</h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    {template.recurrenceType} · {template.estimatedMinutes} 分钟 · 优先级 {template.priority}
+                    {template.recurrenceType}
+                    {template.recurrenceType === 'INTERVAL_DAYS' && template.intervalDays
+                      ? `（每 ${template.intervalDays} 天）`
+                      : ''}{' '}
+                    · {template.estimatedMinutes} 分钟 · 优先级 {template.priority}
                   </p>
                   {template.defaultStartTime ? <p className="text-xs text-slate-500">默认开始：{template.defaultStartTime}</p> : null}
                   {template.activeFrom || template.activeTo ? (
@@ -141,7 +152,7 @@ export function TemplatesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         <h2 className="text-xl font-semibold text-slate-900">{editingTemplateId ? '编辑周期任务' : '新建周期任务'}</h2>
         <form
           className="mt-4 space-y-3"
@@ -153,6 +164,7 @@ export function TemplatesPage() {
               description: form.description || undefined,
               dayOfWeek: form.recurrenceType === 'WEEKLY' ? form.dayOfWeek : undefined,
               specificDate: form.recurrenceType === 'SPECIFIC_DATE' ? form.specificDate : undefined,
+              intervalDays: form.recurrenceType === 'INTERVAL_DAYS' ? form.intervalDays : undefined,
               defaultStartTime: form.defaultStartTime || undefined,
               activeFrom: form.activeFrom || undefined,
               activeTo: form.activeTo || undefined,
@@ -191,7 +203,13 @@ export function TemplatesPage() {
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 max={720}
                 min={5}
-                onChange={(event) => setForm((prev) => ({ ...prev, estimatedMinutes: Number(event.target.value) }))}
+                onChange={(event) => {
+                  const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                  if (event.target.value !== normalizedValue) {
+                    event.target.value = normalizedValue
+                  }
+                  setForm((prev) => ({ ...prev, estimatedMinutes: nextValue }))
+                }}
                 required
                 type="number"
                 value={form.estimatedMinutes}
@@ -204,7 +222,13 @@ export function TemplatesPage() {
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 max={5}
                 min={1}
-                onChange={(event) => setForm((prev) => ({ ...prev, priority: Number(event.target.value) }))}
+                onChange={(event) => {
+                  const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                  if (event.target.value !== normalizedValue) {
+                    event.target.value = normalizedValue
+                  }
+                  setForm((prev) => ({ ...prev, priority: nextValue }))
+                }}
                 required
                 type="number"
                 value={form.priority}
@@ -234,7 +258,13 @@ export function TemplatesPage() {
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 max={7}
                 min={1}
-                onChange={(event) => setForm((prev) => ({ ...prev, dayOfWeek: Number(event.target.value) }))}
+                onChange={(event) => {
+                  const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                  if (event.target.value !== normalizedValue) {
+                    event.target.value = normalizedValue
+                  }
+                  setForm((prev) => ({ ...prev, dayOfWeek: nextValue }))
+                }}
                 required
                 type="number"
                 value={form.dayOfWeek}
@@ -251,6 +281,27 @@ export function TemplatesPage() {
                 required
                 type="date"
                 value={form.specificDate}
+              />
+            </label>
+          ) : null}
+
+          {form.recurrenceType === 'INTERVAL_DAYS' ? (
+            <label className="block text-sm font-medium text-slate-700">
+              间隔天数
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                max={365}
+                min={1}
+                onChange={(event) => {
+                  const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                  if (event.target.value !== normalizedValue) {
+                    event.target.value = normalizedValue
+                  }
+                  setForm((prev) => ({ ...prev, intervalDays: nextValue }))
+                }}
+                required
+                type="number"
+                value={form.intervalDays}
               />
             </label>
           ) : null}
@@ -284,6 +335,7 @@ export function TemplatesPage() {
               <input
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 onChange={(event) => setForm((prev) => ({ ...prev, activeFrom: event.target.value }))}
+                required={form.recurrenceType === 'INTERVAL_DAYS'}
                 type="date"
                 value={form.activeFrom}
               />

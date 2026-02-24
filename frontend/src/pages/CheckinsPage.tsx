@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import DatePicker from 'react-datepicker'
 import {
   deleteHourlyCheckin,
   getCheckinsByDate,
@@ -8,7 +9,13 @@ import {
   updateHourlyCheckin,
 } from '@/features/checkins/api'
 import { ApiError } from '@/shared/api/client'
-import { todayDate, toLocalDateTimeInput } from '@/shared/lib/date'
+import { toDateInputValue, toDateTimeLocalValue, todayDate, toLocalDateTimeInput } from '@/shared/lib/date'
+
+function parseNumberInput(rawValue: string) {
+  const normalizedValue = rawValue.replace(/^0+(?=\d)/, '')
+  const nextValue = normalizedValue === '' ? 0 : Number(normalizedValue)
+  return { normalizedValue, nextValue }
+}
 
 function normalizeReferenceLink(value: string) {
   const trimmed = value.trim()
@@ -121,11 +128,24 @@ export function CheckinsPage() {
     return [...plannedRecords, ...adHocRecords]
   }, [adHocRows, linkByTaskId, linkEnabledByTaskId, minutesByTaskId, pendingQuery.data?.plannedTasks])
 
+  const selectedReferenceDate = useMemo(() => {
+    if (!referenceTime) {
+      return null
+    }
+    const parsed = new Date(referenceTime)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }, [referenceTime])
+
+  const selectedHistoryDate = useMemo(() => {
+    const parsed = new Date(`${date}T00:00:00`)
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed
+  }, [date])
+
   const canSubmit = Boolean(pendingQuery.data) && !pendingQuery.data?.submitted && payloadRecords.length > 0 && !submitMutation.isPending
 
   return (
-    <section className="grid gap-6 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-2 lg:overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">当前窗口待打卡</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
@@ -134,26 +154,42 @@ export function CheckinsPage() {
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
               max={720}
               min={1}
-              onChange={(event) => setWindowMinutes(Number(event.target.value))}
+              onChange={(event) => {
+                const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                if (event.target.value !== normalizedValue) {
+                  event.target.value = normalizedValue
+                }
+                setWindowMinutes(nextValue)
+              }}
               type="number"
               value={windowMinutes}
             />
           </label>
           <label className="text-sm font-medium text-slate-700">
             参考时间（可选）
-            <input
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
-              onChange={(event) => setReferenceTime(event.target.value)}
-              type="datetime-local"
-              value={referenceTime}
+            <DatePicker
+              calendarClassName="ed-datepicker-calendar"
+              className="ed-datepicker-input mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
+              dateFormat="yyyy/MM/dd HH:mm"
+              isClearable
+              onChange={(value: Date | null) => setReferenceTime(value ? toDateTimeLocalValue(value) : '')}
+              placeholderText="请选择参考时间"
+              popperClassName="ed-datepicker-popper"
+              selected={selectedReferenceDate}
+              showPopperArrow={false}
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={5}
+              wrapperClassName="w-full"
             />
           </label>
         </div>
 
-        {pendingQuery.isLoading ? <p className="mt-3 text-slate-600">加载中...</p> : null}
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+          {pendingQuery.isLoading ? <p className="mt-3 text-slate-600">加载中...</p> : null}
 
-        {pendingQuery.data ? (
-          <>
+          {pendingQuery.data ? (
+            <>
             <p className="mt-2 text-sm text-slate-600">{pendingQuery.data.prompt}</p>
             <p className="mt-1 text-sm text-slate-700">
               {toLocalDateTimeInput(pendingQuery.data.windowStart)} - {toLocalDateTimeInput(pendingQuery.data.windowEnd)}
@@ -172,10 +208,16 @@ export function CheckinsPage() {
                       max={720}
                       min={0}
                       onChange={(event) =>
-                        setMinutesByTaskId((prev) => ({
-                          ...prev,
-                          [task.id]: Number(event.target.value),
-                        }))
+                        {
+                          const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                          if (event.target.value !== normalizedValue) {
+                            event.target.value = normalizedValue
+                          }
+                          setMinutesByTaskId((prev) => ({
+                            ...prev,
+                            [task.id]: nextValue,
+                          }))
+                        }
                       }
                       type="number"
                       value={minutesByTaskId[task.id] ?? 0}
@@ -243,13 +285,15 @@ export function CheckinsPage() {
                     <input
                       className="rounded-md border border-slate-300 px-2 py-1 text-sm"
                       min={0}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                        if (event.target.value !== normalizedValue) {
+                          event.target.value = normalizedValue
+                        }
                         setAdHocRows((prev) =>
-                          prev.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, completedMinutes: Number(event.target.value) } : item
-                          )
+                          prev.map((item, itemIndex) => (itemIndex === index ? { ...item, completedMinutes: nextValue } : item))
                         )
-                      }
+                      }}
                       placeholder="分钟"
                       type="number"
                       value={row.completedMinutes}
@@ -310,23 +354,33 @@ export function CheckinsPage() {
             >
               {submitMutation.isPending ? '提交中...' : '提交窗口打卡'}
             </button>
-          </>
-        ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">历史打卡</h2>
         <label className="mt-3 block text-sm font-medium text-slate-700">
           日期
-          <input
-            className="mt-1 block rounded-lg border border-slate-300 px-3 py-2"
-            onChange={(event) => setDate(event.target.value)}
-            type="date"
-            value={date}
+          <DatePicker
+            calendarClassName="ed-datepicker-calendar"
+            className="ed-datepicker-input mt-1 block rounded-lg border border-slate-300 px-3 py-2"
+            dateFormat="yyyy/MM/dd"
+            onChange={(value: Date | null) => {
+              if (!value) {
+                return
+              }
+              setDate(toDateInputValue(value))
+            }}
+            popperClassName="ed-datepicker-popper"
+            selected={selectedHistoryDate}
+            showPopperArrow={false}
+            wrapperClassName="w-full"
           />
         </label>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {historyQuery.isLoading ? <p className="text-slate-600">加载中...</p> : null}
           {historyQuery.data?.length === 0 ? <p className="text-slate-600">当天没有打卡记录。</p> : null}
           {historyQuery.data?.map((item) => {
@@ -351,13 +405,17 @@ export function CheckinsPage() {
                         <input
                           className="rounded-md border border-slate-300 px-2 py-1 text-sm"
                           min={1}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                            if (event.target.value !== normalizedValue) {
+                              event.target.value = normalizedValue
+                            }
                             setEditingRecords((prev) =>
                               prev.map((itemRecord, itemIndex) =>
-                                itemIndex === index ? { ...itemRecord, completedMinutes: Number(event.target.value) } : itemRecord
+                                itemIndex === index ? { ...itemRecord, completedMinutes: nextValue } : itemRecord
                               )
                             )
-                          }
+                          }}
                           type="number"
                           value={record.completedMinutes}
                         />

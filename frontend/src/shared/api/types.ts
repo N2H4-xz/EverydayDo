@@ -29,6 +29,7 @@ export type RecurrenceType =
   | 'HOLIDAY'
   | 'WEEKLY'
   | 'SPECIFIC_DATE'
+  | 'INTERVAL_DAYS'
 
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 
@@ -56,6 +57,7 @@ export interface TaskTemplateResponse {
   recurrenceType: RecurrenceType
   dayOfWeek: number | null
   specificDate: string | null
+  intervalDays: number | null
   defaultStartTime: string | null
   activeFrom: string | null
   activeTo: string | null
@@ -70,6 +72,7 @@ export interface UpdateTaskTemplatePayload {
   recurrenceType: RecurrenceType
   dayOfWeek?: number
   specificDate?: string
+  intervalDays?: number
   defaultStartTime?: string
   activeFrom?: string
   activeTo?: string

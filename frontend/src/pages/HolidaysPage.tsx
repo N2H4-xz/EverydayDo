@@ -47,8 +47,8 @@ export function HolidaysPage() {
   })
 
   return (
-    <section className="grid gap-6 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-2 lg:overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">节假日范围查看</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
@@ -71,7 +71,7 @@ export function HolidaysPage() {
           </label>
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {holidaysQuery.isLoading ? <p className="text-slate-600">加载中...</p> : null}
           {holidaysQuery.data?.map((item) => (
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3" key={item.holidayDate}>
@@ -96,7 +96,7 @@ export function HolidaysPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         <h2 className="text-xl font-semibold text-slate-900">新增/更新节假日覆盖</h2>
         <form
           className="mt-4 space-y-3"

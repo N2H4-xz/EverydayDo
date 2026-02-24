@@ -33,6 +33,7 @@ public class TaskTemplateService {
         entity.setRecurrenceType(request.recurrenceType());
         entity.setDayOfWeek(request.dayOfWeek());
         entity.setSpecificDate(request.specificDate());
+        entity.setIntervalDays(request.intervalDays());
         entity.setDefaultStartTime(request.defaultStartTime());
         entity.setActiveFrom(request.activeFrom());
         entity.setActiveTo(request.activeTo());
@@ -50,6 +51,7 @@ public class TaskTemplateService {
                 request.recurrenceType(),
                 request.dayOfWeek(),
                 request.specificDate(),
+                request.intervalDays(),
                 request.activeFrom(),
                 request.activeTo()
         );
@@ -62,6 +64,7 @@ public class TaskTemplateService {
         entity.setRecurrenceType(request.recurrenceType());
         entity.setDayOfWeek(request.dayOfWeek());
         entity.setSpecificDate(request.specificDate());
+        entity.setIntervalDays(request.intervalDays());
         entity.setDefaultStartTime(request.defaultStartTime());
         entity.setActiveFrom(request.activeFrom());
         entity.setActiveTo(request.activeTo());
@@ -105,6 +108,7 @@ public class TaskTemplateService {
                 request.recurrenceType(),
                 request.dayOfWeek(),
                 request.specificDate(),
+                request.intervalDays(),
                 request.activeFrom(),
                 request.activeTo()
         );
@@ -114,6 +118,7 @@ public class TaskTemplateService {
             RecurrenceType recurrenceType,
             Integer dayOfWeek,
             LocalDate specificDate,
+            Integer intervalDays,
             LocalDate activeFrom,
             LocalDate activeTo
     ) {
@@ -122,6 +127,14 @@ public class TaskTemplateService {
         }
         if (recurrenceType == RecurrenceType.SPECIFIC_DATE && specificDate == null) {
             throw new IllegalArgumentException("specificDate is required for SPECIFIC_DATE templates");
+        }
+        if (recurrenceType == RecurrenceType.INTERVAL_DAYS) {
+            if (intervalDays == null || intervalDays <= 0) {
+                throw new IllegalArgumentException("intervalDays is required for INTERVAL_DAYS templates");
+            }
+            if (activeFrom == null) {
+                throw new IllegalArgumentException("activeFrom is required for INTERVAL_DAYS templates");
+            }
         }
         if (activeFrom != null && activeTo != null && activeFrom.isAfter(activeTo)) {
             throw new IllegalArgumentException("activeFrom cannot be later than activeTo");
@@ -148,6 +161,7 @@ public class TaskTemplateService {
                 entity.getRecurrenceType(),
                 entity.getDayOfWeek(),
                 entity.getSpecificDate(),
+                entity.getIntervalDays(),
                 entity.getDefaultStartTime(),
                 entity.getActiveFrom(),
                 entity.getActiveTo(),

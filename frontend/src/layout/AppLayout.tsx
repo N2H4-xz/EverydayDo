@@ -40,7 +40,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-6xl p-4 md:p-6">
+    <div className="mx-auto max-w-6xl p-4 md:p-6 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
       <header className="mb-6 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur md:flex md:items-center md:justify-between">
         <div>
           <Link className="text-2xl font-semibold tracking-tight text-slate-900" to="/today">
@@ -71,7 +71,7 @@ export function AppLayout() {
           </button>
         </nav>
       </header>
-      <main>
+      <main className="lg:min-h-0 lg:flex-1 lg:overflow-hidden">
         <Outlet />
       </main>
     </div>

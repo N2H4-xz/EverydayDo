@@ -5,6 +5,12 @@ import { createManualTask, deleteTask, generatePlanForDate, getTasksByDate, setT
 import { todayDate } from '@/shared/lib/date'
 import type { TaskInstanceResponse, TaskStatus } from '@/shared/api/types'
 
+function parseNumberInput(rawValue: string) {
+  const normalizedValue = rawValue.replace(/^0+(?=\d)/, '')
+  const nextValue = normalizedValue === '' ? 0 : Number(normalizedValue)
+  return { normalizedValue, nextValue }
+}
+
 function toEditForm(task: TaskInstanceResponse) {
   return {
     title: task.title,
@@ -89,8 +95,8 @@ export function TodayPage() {
   const statusOptions = useMemo<TaskStatus[]>(() => ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], [])
 
   return (
-    <section className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="space-y-6 lg:grid lg:h-full lg:min-h-0 lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">今日任务</h2>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="text-sm font-medium text-slate-700">
@@ -112,13 +118,32 @@ export function TodayPage() {
           </button>
         </div>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {tasksQuery.isLoading ? <p className="text-slate-600">加载任务中...</p> : null}
           {tasksQuery.data?.length === 0 ? <p className="text-slate-600">暂无任务，可以先添加手动任务。</p> : null}
           {tasksQuery.data?.map((task) => {
             const isEditing = editingTaskId === task.id && editForm
+            const isCompleted = task.status === 'COMPLETED'
+            const isCancelled = task.status === 'CANCELLED'
+            const statusBadgeClass =
+              task.status === 'COMPLETED'
+                ? 'bg-emerald-100 text-emerald-800'
+                : task.status === 'IN_PROGRESS'
+                  ? 'bg-sky-100 text-sky-800'
+                  : task.status === 'CANCELLED'
+                    ? 'bg-rose-100 text-rose-700'
+                    : 'bg-slate-100 text-slate-600'
             return (
-              <article className="rounded-xl border border-slate-200 p-4" key={task.id}>
+              <article
+                className={`rounded-xl border p-4 ${
+                  isCompleted
+                    ? 'border-emerald-300 bg-emerald-50/60'
+                    : isCancelled
+                      ? 'border-rose-200 bg-rose-50/40'
+                      : 'border-slate-200'
+                }`}
+                key={task.id}
+              >
                 {isEditing ? (
                   <form
                     className="grid gap-2 md:grid-cols-2"
@@ -177,9 +202,13 @@ export function TodayPage() {
                       className="rounded-lg border border-slate-300 px-3 py-2"
                       max={720}
                       min={5}
-                      onChange={(event) =>
-                        setEditForm((prev) => (prev ? { ...prev, plannedMinutes: Number(event.target.value) } : prev))
-                      }
+                      onChange={(event) => {
+                        const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                        if (event.target.value !== normalizedValue) {
+                          event.target.value = normalizedValue
+                        }
+                        setEditForm((prev) => (prev ? { ...prev, plannedMinutes: nextValue } : prev))
+                      }}
                       required
                       type="number"
                       value={editForm.plannedMinutes}
@@ -214,10 +243,12 @@ export function TodayPage() {
                 ) : (
                   <>
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="font-semibold text-slate-900">{task.title}</h3>
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">{task.status}</span>
+                      <h3 className={`font-semibold ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{task.title}</h3>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusBadgeClass}`}>{task.status}</span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{task.description || '无描述'}</p>
+                    <p className={`mt-2 text-sm ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-600'}`}>
+                      {task.description || '无描述'}
+                    </p>
                     <p className="mt-2 text-sm text-slate-700">
                       日期 {task.planDate}
                       {task.plannedStartTime ? ` ${task.plannedStartTime}` : ''} · 计划 {task.plannedMinutes} 分钟，已完成 {task.completedMinutes}{' '}
@@ -235,13 +266,15 @@ export function TodayPage() {
                       >
                         编辑
                       </button>
-                      <button
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
-                        onClick={() => statusMutation.mutate({ taskId: task.id, status: 'COMPLETED' })}
-                        type="button"
-                      >
-                        标记完成
-                      </button>
+                      {!isCompleted ? (
+                        <button
+                          className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                          onClick={() => statusMutation.mutate({ taskId: task.id, status: 'COMPLETED' })}
+                          type="button"
+                        >
+                          标记完成
+                        </button>
+                      ) : null}
                       <button
                         className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
                         onClick={() => statusMutation.mutate({ taskId: task.id, status: 'CANCELLED' })}
@@ -265,7 +298,7 @@ export function TodayPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         <h2 className="text-xl font-semibold text-slate-900">添加任务</h2>
         <form
           className="mt-4 grid gap-3 md:grid-cols-2"
@@ -297,7 +330,13 @@ export function TodayPage() {
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2"
               max={720}
               min={5}
-              onChange={(event) => setPlannedMinutes(Number(event.target.value))}
+              onChange={(event) => {
+                const { normalizedValue, nextValue } = parseNumberInput(event.target.value)
+                if (event.target.value !== normalizedValue) {
+                  event.target.value = normalizedValue
+                }
+                setPlannedMinutes(nextValue)
+              }}
               required
               type="number"
               value={plannedMinutes}

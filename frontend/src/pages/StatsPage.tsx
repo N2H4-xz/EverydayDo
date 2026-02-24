@@ -34,8 +34,8 @@ export function StatsPage() {
   })
 
   return (
-    <section className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="space-y-6 lg:grid lg:h-full lg:min-h-0 lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:pr-1">
         <h2 className="text-xl font-semibold text-slate-900">完成率统计</h2>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -107,7 +107,7 @@ export function StatsPage() {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex lg:min-h-0 lg:flex-col">
         <h2 className="text-xl font-semibold text-slate-900">回顾内容</h2>
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -137,7 +137,7 @@ export function StatsPage() {
 
         {reviewsQuery.isLoading ? <p className="mt-4 text-slate-600">加载回顾中...</p> : null}
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
           {reviewsQuery.data?.items.length === 0 ? <p className="text-slate-600">暂无回顾内容。</p> : null}
 
           {reviewsQuery.data?.items.map((item) => (

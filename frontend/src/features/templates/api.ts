@@ -9,6 +9,7 @@ interface CreateTemplatePayload {
   recurrenceType: RecurrenceType
   dayOfWeek?: number
   specificDate?: string
+  intervalDays?: number
   defaultStartTime?: string
   activeFrom?: string
   activeTo?: string

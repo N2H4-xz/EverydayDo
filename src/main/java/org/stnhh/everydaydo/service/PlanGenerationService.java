@@ -1,12 +1,12 @@
 package org.stnhh.everydaydo.service;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.stnhh.everydaydo.model.entity.TaskTemplateEntity;
-import org.stnhh.everydaydo.model.enums.RecurrenceType;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +41,18 @@ public class PlanGenerationService {
             case HOLIDAY -> holidayService.isHoliday(date);
             case WEEKLY -> template.getDayOfWeek() != null && date.getDayOfWeek().getValue() == template.getDayOfWeek();
             case SPECIFIC_DATE -> date.equals(template.getSpecificDate());
+            case INTERVAL_DAYS -> matchesIntervalDays(template, date);
         };
+    }
+
+    private boolean matchesIntervalDays(TaskTemplateEntity template, LocalDate date) {
+        if (template.getIntervalDays() == null || template.getIntervalDays() <= 0 || template.getActiveFrom() == null) {
+            return false;
+        }
+        if (date.isBefore(template.getActiveFrom())) {
+            return false;
+        }
+        long daysBetween = ChronoUnit.DAYS.between(template.getActiveFrom(), date);
+        return daysBetween % template.getIntervalDays() == 0;
     }
 }

@@ -16,6 +16,7 @@ public record UpdateTemplateRequest(
         @NotNull RecurrenceType recurrenceType,
         @Min(1) @Max(7) Integer dayOfWeek,
         LocalDate specificDate,
+        @Min(1) @Max(365) Integer intervalDays,
         LocalTime defaultStartTime,
         LocalDate activeFrom,
         LocalDate activeTo,
